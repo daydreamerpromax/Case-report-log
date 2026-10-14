@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b6e6e" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c1616" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Posting Log">
+<title>Posting Log</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column on phones; on laptops the Today tab splits into the entry form (left) and the week + day list (right). Case-sheet feel: mono dates, teal ink, ruled cards. */
+:root{
+  --bg:#f1f6f5; --surface:#ffffff; --ink:#12201f; --muted:#546f6c; --line:#d5e2e0;
+  --accent:#0b6e6e; --accent-ink:#ffffff; --accent-soft:#d8eeec;
+  --good:#1d7a45; --good-soft:#dcf1e3; --warn:#975f00; --warn-soft:#fbefcf; --bad:#b32d2d; --bad-soft:#fbe1e1;
+  --display:"Bricolage Grotesque","Trebuchet MS","Segoe UI",system-ui,sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1616; --surface:#132121; --ink:#e5f1ef; --muted:#92aeab; --line:#263b3a;
+  --accent:#4fd1c5; --accent-ink:#04201e; --accent-soft:#14393a;
+  --good:#5fd18d; --good-soft:#133524; --warn:#e8b04a; --warn-soft:#3a2f12; --bad:#ff8c8c; --bad-soft:#41201f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1616; --surface:#132121; --ink:#e5f1ef; --muted:#92aeab; --line:#263b3a;
+  --accent:#4fd1c5; --accent-ink:#04201e; --accent-soft:#14393a;
+  --good:#5fd18d; --good-soft:#133524; --warn:#e8b04a; --warn-soft:#3a2f12; --bad:#ff8c8c; --bad-soft:#41201f; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 56px}
+.app{max-width:680px;margin-inline:auto;display:flex;flex-direction:column;gap:16px}
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.two{display:flex;flex-direction:column;gap:16px}
+.two>*{min-width:0}
+@media (min-width:960px){.app{max-width:1020px}.two{display:grid;grid-template-columns:1.05fr .95fr;gap:20px;align-items:start}}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.15;text-wrap:balance}
+h1{font-size:1.7rem;letter-spacing:-.01em} h2{font-size:1.15rem} h3{font-size:1rem}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.sync{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.sync.ok i{background:var(--good)} .sync.busy i{background:var(--warn)} .sync.err i{background:var(--bad)}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
+.tabs button{border:0;background:transparent;border-radius:9px;padding:10px 0;font-weight:600;font-size:.8rem;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card p{margin:0}
+.muted{color:var(--muted);font-size:.88rem}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.barhead{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{font-size:.74rem;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap;background:var(--line);color:var(--muted)}
+.pill.dept{background:var(--accent-soft);color:var(--accent)}
+.pill.good{background:var(--good-soft);color:var(--good)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+/* form */
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form .full{grid-column:1/-1}
+.form label,.fl{display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--muted);font-weight:600;letter-spacing:.02em;min-width:0}
+input,select,textarea{width:100%;min-width:0;font:inherit;font-size:1rem;padding:0 10px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+input,select{height:44px}
+textarea{padding:10px;min-height:5.2em;resize:vertical;line-height:1.4}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:.6}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg button{height:44px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);font-weight:600}
+.seg button[aria-pressed="true"].a{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.seg button[aria-pressed="true"].m{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.chk{flex-direction:row!important;align-items:center;gap:10px!important;font-size:.95rem!important;color:var(--ink)!important;font-weight:500!important;letter-spacing:0!important}
+.chk input{width:22px;height:22px;accent-color:var(--accent)}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+.quick button{background:var(--accent-soft);border:0;border-radius:99px;padding:5px 11px;font-size:.8rem;font-weight:600;color:var(--accent)}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 16px;font-weight:600;min-height:44px}
+.btn.big{min-height:52px;font-size:1.05rem}
+.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.btn.danger{background:var(--bad);color:var(--surface)}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.mini{background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:6px 12px;font-size:.82rem;font-weight:600;color:var(--muted);min-height:36px}
+.mini.danger{color:var(--bad);border-color:var(--bad)}
+.note{border-radius:10px;padding:10px 12px;font-size:.92rem;background:var(--accent-soft)}
+.note.warn{background:var(--warn-soft)} .note.good{background:var(--good-soft)}
+/* week strip */
+.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.wd{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.72rem;color:var(--muted);min-width:0}
+.wd b{font-family:var(--mono);font-size:1rem;color:var(--ink);font-weight:500}
+.wd em{font-style:normal;font-family:var(--mono);font-size:.72rem;height:1.2em;border-radius:99px;padding:0 6px;min-width:1.6em;text-align:center}
+.wd.has em{background:var(--good-soft);color:var(--good)} .wd.miss em{background:var(--bad-soft);color:var(--bad)}
+.wd.today b{color:var(--accent)} .wd.sel{border-color:var(--accent);background:var(--accent-soft)}
+.wd.future{opacity:.65}
+.weeknav{display:flex;align-items:center;gap:6px}
+.weeknav button{background:var(--surface);border:1px solid var(--line);border-radius:10px;width:40px;height:40px;font-size:1.1rem}
+.weeknav span{font-size:.85rem;color:var(--muted);min-width:8.5em;text-align:center}
+/* entries */
+.ent{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.ent.missed{border-left:4px solid var(--bad)}
+.ent-head{display:flex;flex-direction:column;gap:5px;width:100%;text-align:left;background:transparent;border:0;padding:12px 14px}
+.ent-top{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:.76rem;color:var(--muted)}
+.ent-topic{font-family:var(--display);font-size:1.05rem;line-height:1.25}
+.ent-body{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px;border-top:1px dashed var(--line);padding-top:12px}
+.fld small{display:block;font-size:.72rem;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.fld div{white-space:pre-wrap;overflow-wrap:anywhere}
+.dayh{font-family:var(--mono);font-size:.8rem;color:var(--muted);padding-top:6px}
+.list{display:flex;flex-direction:column;gap:10px}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.filters .full{grid-column:1/-1}
+/* stats */
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (min-width:560px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--accent-soft);border-radius:12px;padding:10px 12px}
+.tile b{display:block;font-family:var(--display);font-size:1.6rem;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile span{font-size:.78rem;color:var(--muted)}
+.bars{display:flex;flex-direction:column;gap:7px}
+.brow{display:grid;grid-template-columns:minmax(5.5em,38%) 1fr 2.2em;gap:10px;align-items:center;font-size:.85rem}
+.brow span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .tr{height:14px;border-radius:5px;background:var(--line);overflow:hidden}
+.brow .tr i{display:block;height:100%;background:var(--accent);border-radius:5px}
+.brow.cur .tr i{background:var(--good)}
+.brow b{font-family:var(--mono);font-weight:500;text-align:right}
+.prog{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent)}
+.foot{display:flex;flex-direction:column;gap:10px;padding-top:4px}
+@media (prefers-reduced-motion:no-preference){.prog i,.brow .tr i{transition:width .25s}}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(56px + env(safe-area-inset-bottom,0px))}
+.steps{margin:0;padding-left:1.2em;font-size:.88rem;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.steps code{font-family:var(--mono);font-size:.82rem;color:var(--ink)}
+.report{max-width:760px;width:100%;margin-inline:auto;gap:14px}
+.rhead small{font-family:var(--mono);letter-spacing:.1em;color:var(--muted);font-size:.72rem}
+.rhead h2{font-size:1.4rem;margin-top:4px}
+.rmeta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px;padding:12px 0;border-block:1px solid var(--line)}
+.rmeta small{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.rmeta div{min-width:0;overflow-wrap:anywhere}
+.rgrp{font-family:var(--mono);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:8px}
+.rsec{display:flex;flex-direction:column;gap:3px;break-inside:avoid}
+.rsec h3{font-size:.95rem}
+.rsec div{white-space:pre-wrap;overflow-wrap:anywhere}
+.rfoot{font-size:.78rem;color:var(--muted)}
+.sech{font-family:var(--mono);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:6px}
+@media print{
+  :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--bg:#fff;--surface:#fff;--ink:#111;--muted:#444;--line:#bbb;--accent:#0b6e6e;--accent-soft:#eee;color-scheme:light}
+  .top,.tabs,.foot,.noprint{display:none!important}
+  body{padding:0;background:#fff;color:#111;font-size:12pt}
+  .app{max-width:none}
+  .report{border:0;padding:0;max-width:none}
+}
+</style>
+</head><body>
+
+<main class="app" id="app">
+  <div class="top">
+    <div>
+      <h1>Posting Log</h1>
+      <div class="sync" id="sync"><i></i><span>Loading…</span></div>
+    </div>
+  </div>
+  <div class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="today" aria-selected="true">Today</button>
+    <button role="tab" data-tab="cases" aria-selected="false">Cases</button>
+    <button role="tab" data-tab="history" aria-selected="false">History</button>
+    <button role="tab" data-tab="postings" aria-selected="false">Postings</button>
+    <button role="tab" data-tab="stats" aria-selected="false">Stats</button>
+  </div>
+  <section id="view"></section>
+  <div class="foot card">
+    <h3>Sync between devices</h3>
+    <div id="syncbox"></div>
+  </div>
+  <div class="foot card">
+    <h3>Backup</h3>
+    <p class="muted">Nothing you log is ever deleted automatically. A deleted class or case moves to Recently deleted (History tab) and can be restored. A backup file is a spare copy of your whole log; restoring merges it with what is already here.</p>
+    <div class="btnrow"><button class="btn ghost" id="exp">Save backup</button><button class="btn ghost" id="imp">Restore backup</button></div>
+    <input type="file" id="impfile" accept=".json,application/json" hidden>
+    <div id="footmsg"></div>
+  </div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var LS="posting-log-v1";
+  var TYPES=["Bedside clinic","Case discussion","Ward round","OPD posting","Lecture / seminar","Skill lab","Early clinical exposure","AETCOM","Other"];
+  var DEPTS=["General Medicine","General Surgery","Obstetrics & Gynaecology","Paediatrics","Orthopaedics","ENT","Ophthalmology","Community Medicine","Psychiatry","Dermatology","Anaesthesiology","Radiodiagnosis","Emergency Medicine"];
+  var DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+  /* ---------- helpers ---------- */
+  function pad(n){return (n<10?"0":"")+n}
+  function key(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+  function parse(k){var p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2])}
+  function todayKey(){return key(new Date())}
+  function addDays(k,n){var d=parse(k);d.setDate(d.getDate()+n);return key(d)}
+  function mondayOf(k){var d=parse(k);d.setDate(d.getDate()-((d.getDay()+6)%7));return key(d)}
+  function fmtShort(k){return parse(k).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}
+  function fmtLong(k){return parse(k).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric"})}
+  function diffDays(a,b){return Math.round((parse(b)-parse(a))/86400000)}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+  function clone(o){return JSON.parse(JSON.stringify(o))}
+  function nid(p){return p+"-"+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+  function $(id){return document.getElementById(id)}
+
+  /* ---------- state + local storage ---------- */
+  var docs={};            // id -> doc (entries, postings, and tombstones)
+  var S={tab:"today",day:todayKey(),edit:null,form:null,msg:"",open:{},del:null,cs:{mode:"list",id:null,form:null,q:"",dept:""},binOpen:false,
+    hf:{q:"",dept:"",type:"",flag:"",from:"",to:"",lim:40},pform:null,pEdit:null,pmsg:""};
+  function loadLocal(){try{var d=JSON.parse(localStorage.getItem(LS));if(d&&typeof d==="object")docs=d}catch(e){}}
+  var localOk=true;
+  function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(docs));localOk=true}catch(e){localOk=false}}
+
+  function entries(){return Object.keys(docs).map(function(i){return docs[i]}).filter(function(d){return d.kind==="entry"&&!d.del})
+    .sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:(b.created||0)-(a.created||0)})}
+  function postings(){return Object.keys(docs).map(function(i){return docs[i]}).filter(function(d){return d.kind==="posting"&&!d.del})
+    .sort(function(a,b){return a.start<b.start?1:-1})}
+  function put(d){d.u=Date.now();docs[d.id]=d;saveLocal();queuePush(d.id);renderData()}
+  function postingFor(k){var l=postings().filter(function(p){return p.start<=k&&k<=p.end});return l[0]||null}
+
+  /* ---------- sync via a private GitHub gist (merge per item, newest edit wins) ---------- */
+  var GH="https://api.github.com",FILE="posting-log.json",DESC="Posting Log data";
+  var cfg={token:"",gist:"",last:0},syncMode="off",syncBusy=false,syncAgain=false,syncTimer=null,syncErr="";
+  function loadCfg(){try{var c=JSON.parse(localStorage.getItem(LS+"-sync"));if(c&&typeof c==="object")cfg=c}catch(e){}}
+  function saveCfg(){try{localStorage.setItem(LS+"-sync",JSON.stringify(cfg))}catch(e){}}
+  function hhmm(t){var d=new Date(t);return pad(d.getHours())+":"+pad(d.getMinutes())}
+  function syncLabel(){
+    var el=$("sync");if(!el)return;
+    var cls="",txt;
+    if(!localOk){cls="err";txt="Could not save on this device. Browser storage is blocked."}
+    else if(!cfg.token){txt="Saved on this device. Connect GitHub below to sync."}
+    else if(syncBusy){cls="busy";txt="Syncing…"}
+    else if(syncMode==="error"){cls="err";txt=syncErr||"Sync failed. Saved here, will retry."}
+    else if(syncTimer){cls="busy";txt="Saved here, syncing soon…"}
+    else if(cfg.last){cls="ok";txt="Synced at "+hhmm(cfg.last)}
+    else{cls="busy";txt="Waiting to sync…"}
+    el.className="sync "+cls;el.lastChild.textContent=txt;
+  }
+  function api(path,opt){
+    opt=opt||{};opt.headers={"Authorization":"Bearer "+cfg.token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"};
+    if(opt.body)opt.headers["Content-Type"]="application/json";
+    return fetch(GH+path,opt).then(function(r){
+      if(!r.ok){var e=new Error("HTTP "+r.status);e.status=r.status;throw e}
+      return r.json();
+    });
+  }
+  function findOrCreateGist(){
+    return api("/gists?per_page=100").then(function(list){
+      var g=list.filter(function(x){return x.files&&x.files[FILE]})[0];
+      if(g)return g.id;
+      var files={};files[FILE]={content:"{}"};
+      return api("/gists",{method:"POST",body:JSON.stringify({description:DESC,public:false,files:files})}).then(function(n){return n.id});
+    });
+  }
+  function readGist(id){
+    return api("/gists/"+id).then(function(g){
+      var f=g.files&&g.files[FILE];if(!f)return [];
+      var get=f.truncated?fetch(f.raw_url).then(function(r){return r.text()}):Promise.resolve(f.content);
+      return get.then(function(t){try{var d=JSON.parse(t||"{}");return Array.isArray(d.docs)?d.docs:[]}catch(e){return []}});
+    });
+  }
+  function syncNow(){
+    clearTimeout(syncTimer);syncTimer=null;
+    if(!cfg.token)return Promise.resolve();
+    if(syncBusy){syncAgain=true;return Promise.resolve()}
+    if(navigator.onLine===false){syncMode="error";syncErr="Offline. Saved here, will sync when you are back online.";syncLabel();return Promise.resolve()}
+    syncBusy=true;syncLabel();
+    var idp=cfg.gist?Promise.resolve(cfg.gist):findOrCreateGist().then(function(id){cfg.gist=id;saveCfg();return id});
+    return idp.then(function(id){
+      return readGist(id).then(function(remote){
+        var rmap={},changed=false,needPush=false;
+        remote.forEach(function(r){if(!r||!r.id)return;rmap[r.id]=r;var l=docs[r.id];if(!l||(r.u||0)>(l.u||0)){docs[r.id]=r;changed=true}});
+        Object.keys(docs).forEach(function(i){var r=rmap[i];if(!r||(docs[i].u||0)>(r.u||0))needPush=true});
+        if(changed){saveLocal();renderData()}
+        if(!needPush)return;
+        var files={};files[FILE]={content:JSON.stringify({app:"posting-log",v:1,at:new Date().toISOString(),docs:Object.keys(docs).map(function(i){return docs[i]})})};
+        return api("/gists/"+id,{method:"PATCH",body:JSON.stringify({files:files})});
+      });
+    }).then(function(){cfg.last=Date.now();saveCfg();syncMode="ok";syncErr=""},function(e){
+      syncMode="error";
+      if(e.status===401)syncErr="GitHub rejected the token. Reconnect with a new one below.";
+      else if(e.status===403)syncErr="GitHub is limiting requests or the token lacks the gist permission.";
+      else if(e.status===404){cfg.gist="";saveCfg();syncErr="Could not find the sync gist. Will look again next time."}
+      else syncErr="Could not reach GitHub. Saved here, will retry.";
+    }).then(function(){
+      syncBusy=false;syncLabel();
+      if(syncAgain){syncAgain=false;queuePush()}
+      else if(syncMode==="error"&&cfg.token){syncTimer=setTimeout(syncNow,30000)}
+    });
+  }
+  function queuePush(){
+    if(!cfg.token)return;
+    clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,1500);syncLabel();
+  }
+  function renderSyncBox(msg){
+    var b=$("syncbox");if(!b)return;
+    var o="";
+    if(cfg.token){
+      o+='<p class="muted">Connected. Your log is kept in a private gist on your GitHub account and merges between every device that uses the same token.</p>';
+      o+='<div class="btnrow"><button class="btn ghost" id="syncnow">Sync now</button><button class="btn ghost" id="disc">Disconnect</button></div>';
+    }else{
+      o+='<p class="muted">Your log lives on this device. To keep your phone and laptop in step, connect them to the same GitHub account. Nothing else is needed.</p>';
+      o+='<ol class="steps"><li>On GitHub open Settings, Developer settings, Personal access tokens, Tokens (classic).</li><li>Generate a new token and tick only <code>gist</code>.</li><li>Paste it below on this device, then do the same on your other device with the same token.</li></ol>';
+      o+='<label class="fl">GitHub token<input id="gh-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ghp_…"></label>';
+      o+='<button class="btn" id="conn">Connect</button>';
+    }
+    if(msg)o+='<div class="note warn" role="status">'+esc(msg)+'</div>';
+    b.innerHTML=o;
+  }
+
+  /* ---------- cases: detailed case history reports, kept permanently ---------- */
+  var GROUPS=[["History",[["cc","Chief complaints"],["hpi","History of presenting illness"],["past","Past history"],["personal","Personal history"],["family","Family history"]]],
+    ["Examination",[["general","General examination"],["systemic","Systemic examination"]]],
+    ["Diagnosis and plan",[["provisional","Provisional diagnosis"],["differential","Differential diagnosis"],["investigations","Investigations"],["final","Final diagnosis"],["management","Management"]]],
+    ["Learning",[["learning","Learning points"]]]];
+  var HINTS={cc:"Each complaint with its duration, e.g. Abdominal distension for 2 months",hpi:"Onset, progress, associated symptoms, relevant negatives",past:"Illnesses, surgeries, drugs, allergies",personal:"Diet, habits, occupation, addictions",family:"Similar illness, hereditary conditions",general:"Built, pallor, icterus, cyanosis, clubbing, oedema, vitals",systemic:"CVS, RS, abdomen, CNS findings",provisional:"Your working diagnosis",differential:"Other possibilities",investigations:"Ordered and results seen",final:"Diagnosis as confirmed by the team",management:"Treatment plan as explained",learning:"What this case taught you"};
+  function casesAll(){return Object.keys(docs).map(function(i){return docs[i]}).filter(function(d){return d.kind==="case"&&!d.del})
+    .sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:(b.created||0)-(a.created||0)})}
+  function firstLine(t,n){var l=String(t||"").split("\n")[0].trim();return l.length>n?l.slice(0,n)+"…":l}
+  function caseTitle(c){return c.label||firstLine(c.final,80)||firstLine(c.provisional,80)||firstLine(c.cc,80)||"Case"}
+  function patientText(c){
+    var a=String(c.age||"").trim(),sx={M:"male",F:"female",O:""}[c.sex]||"",p=[];
+    if(a)p.push(/^\d+$/.test(a)?a+"-year-old":a);
+    if(sx)p.push(sx);
+    return p.join(" ")||"Not recorded";
+  }
+  function blankCase(){
+    var le=lastEntry(),pf=postingFor(todayKey());
+    return {date:todayKey(),dept:pf?pf.dept:(le?le.dept:""),unit:pf?(pf.unit||""):"",label:"",age:"",sex:"",classId:"",cc:"",hpi:"",past:"",personal:"",family:"",general:"",systemic:"",provisional:"",differential:"",investigations:"",final:"",management:"",learning:""};
+  }
+  function caseFormFrom(d){var f=blankCase();Object.keys(f).forEach(function(k){if(d[k]!=null)f[k]=d[k]});return f}
+  function classOptions(date,cur){
+    var l=entries().filter(function(e){return e.date===date});
+    return '<option value="">None</option>'+l.map(function(e){return '<option value="'+e.id+'"'+(e.id===cur?' selected':'')+'>'+esc(e.dept+' · '+e.topic)+'</option>'}).join("");
+  }
+  function caseFormHtml(){
+    var f=S.cs.form,editing=!!(S.cs.id&&docs[S.cs.id]);
+    var o='<div class="card"><div class="barhead"><h2>'+(editing?'Edit case':'Log a case')+'</h2><button class="mini" data-act="ccancel">Cancel</button></div>';
+    o+='<p class="muted">When you save, the case opens as a full history report. Use age, sex and diagnosis only. Leave out patient names and hospital numbers.</p><div class="form">';
+    o+='<label>Date<input id="c-date" type="date" data-c="date" value="'+esc(f.date)+'"></label>';
+    o+='<label>From class<select id="c-class" data-c="classId">'+classOptions(f.date,f.classId)+'</select></label>';
+    o+='<label>Department<input id="c-dept" data-c="dept" list="dl-dept" autocomplete="off" placeholder="e.g. General Medicine" value="'+esc(f.dept)+'"></label>'+deptList();
+    o+='<label>Unit or ward (optional)<input id="c-unit" data-c="unit" autocomplete="off" placeholder="e.g. Unit M2" value="'+esc(f.unit)+'"></label>';
+    o+='<label class="full">Case title (optional)<input id="c-label" data-c="label" autocomplete="off" placeholder="e.g. Ascites in chronic liver disease" value="'+esc(f.label)+'"></label>';
+    o+='<label>Age<input id="c-age" data-c="age" autocomplete="off" placeholder="e.g. 54 or 6 months" value="'+esc(f.age)+'"></label>';
+    o+='<label>Sex<select id="c-sex" data-c="sex"><option value="">Not stated</option><option value="M"'+(f.sex==="M"?' selected':'')+'>Male</option><option value="F"'+(f.sex==="F"?' selected':'')+'>Female</option><option value="O"'+(f.sex==="O"?' selected':'')+'>Other</option></select></label>';
+    GROUPS.forEach(function(g){
+      o+='<div class="sech full">'+g[0]+'</div>';
+      g[1].forEach(function(x){o+='<label class="full">'+x[1]+'<textarea id="c-'+x[0]+'" data-c="'+x[0]+'" placeholder="'+esc(HINTS[x[0]])+'">'+esc(f[x[0]])+'</textarea></label>'});
+    });
+    o+='</div>';
+    if(S.msg)o+='<div class="note warn" role="status">'+esc(S.msg)+'</div>';
+    return o+'<button class="btn big" data-act="csave">'+(editing?'Save changes':'Save case')+'</button></div>';
+  }
+  function renderCaseForm(){var s=$("shell");if(s&&S.cs.mode==="form")s.innerHTML=caseFormHtml()}
+  function saveCase(){
+    var f=S.cs.form;
+    if(!f.date||!f.dept.trim()||!f.cc.trim()){S.msg="Add the date, department and chief complaints first.";renderCaseForm();return}
+    var old=S.cs.id&&docs[S.cs.id],d={kind:"case",id:old?old.id:nid("c"),created:old?old.created:Date.now()};
+    Object.keys(f).forEach(function(k){d[k]=typeof f[k]==="string"?f[k].trim():f[k]});
+    put(d);S.msg="";S.cs.mode="report";S.cs.id=d.id;S.cs.form=null;S.del=null;render();window.scrollTo(0,0);
+  }
+  function stamp(t){return t?new Date(t).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"}):""}
+  function reportHtml(id){
+    var c=docs[id];if(!c)return "";
+    var cl=c.classId&&docs[c.classId]&&!docs[c.classId].del?docs[c.classId]:null;
+    var o='<article class="card report" id="report"><div class="barhead noprint"><button class="mini" data-act="cback">‹ All cases</button><div class="btnrow"><button class="mini" data-act="cedit" data-id="'+id+'">Edit</button><button class="mini" data-act="cprint">Print or save PDF</button><button class="mini" data-act="ccopy" data-id="'+id+'">Copy text</button></div></div>';
+    o+='<header class="rhead"><small>CASE HISTORY REPORT</small><h2>'+esc(caseTitle(c))+'</h2></header>';
+    o+='<div class="rmeta"><div><small>Date</small>'+esc(fmtLong(c.date))+'</div><div><small>Department</small>'+esc(c.dept)+'</div>'+(c.unit?'<div><small>Unit or ward</small>'+esc(c.unit)+'</div>':'')+'<div><small>Patient</small>'+esc(patientText(c))+'</div>'+(cl?'<div><small>Seen in class</small>'+esc(cl.topic)+' ('+esc(cl.type)+')'+(cl.faculty?'<br>'+esc(cl.faculty):'')+'</div>':'')+'</div>';
+    GROUPS.forEach(function(g){
+      var secs=g[1].filter(function(x){return c[x[0]]&&String(c[x[0]]).trim()});
+      if(!secs.length)return;
+      o+='<div class="rgrp">'+g[0]+'</div>';
+      secs.forEach(function(x){o+='<section class="rsec"><h3>'+x[1]+'</h3><div>'+esc(c[x[0]])+'</div></section>'});
+    });
+    o+='<p class="rfoot">Logged '+esc(stamp(c.created))+(c.u&&c.u-(c.created||0)>60000?' · last edited '+esc(stamp(c.u)):'')+'</p>';
+    o+='<div class="btnrow noprint">'+(S.del===id?'<button class="mini danger" data-act="cdel" data-id="'+id+'">Tap again to move to Recently deleted</button>':'<button class="mini danger" data-act="cdel" data-id="'+id+'">Delete</button>')+'</div>';
+    return o+'</article>';
+  }
+  function caseText(c){
+    var cl=c.classId&&docs[c.classId]?docs[c.classId]:null;
+    var t=["CASE HISTORY REPORT",caseTitle(c),"","Date: "+fmtLong(c.date),"Department: "+c.dept+(c.unit?" ("+c.unit+")":""),"Patient: "+patientText(c)];
+    if(cl)t.push("Seen in class: "+cl.topic);
+    GROUPS.forEach(function(g){g[1].forEach(function(x){if(c[x[0]]&&String(c[x[0]]).trim())t.push("","## "+x[1],c[x[0]])})});
+    return t.join("\n");
+  }
+  function casesListShell(){
+    var cs=S.cs;
+    return '<div class="card"><div class="barhead"><h2>Cases</h2><button class="btn" data-act="cnew">Log a case</button></div><div class="filters">'+
+      '<label class="full fl">Search<input id="cs-q" type="search" data-cf="q" autocomplete="off" placeholder="Diagnosis, complaint, finding, learning point" value="'+esc(cs.q)+'"></label>'+
+      '<label class="full fl">Department<select id="cs-dept" data-cf="dept"><option value="">All</option>'+allDepts().map(function(d){return '<option'+(d===cs.dept?' selected':'')+'>'+esc(d)+'</option>'}).join("")+'</select></label></div></div>';
+  }
+  function casesDyn(){
+    var q=S.cs.q.trim().toLowerCase(),all=casesAll();
+    var list=all.filter(function(c){
+      if(S.cs.dept&&c.dept!==S.cs.dept)return false;
+      if(q){var t=GROUPS.reduce(function(a,g){return a.concat(g[1].map(function(x){return c[x[0]]||""}))},[c.label,c.dept,c.unit,c.age]).join(" ").toLowerCase();if(t.indexOf(q)<0)return false}
+      return true;
+    });
+    var o='<div class="card"><div class="barhead"><h2>Case reports</h2><span class="muted">'+list.length+' case'+(list.length===1?'':'s')+'</span></div>';
+    if(!list.length)return o+'<p class="muted">'+(all.length?'No case matches these filters.':'Every case you log is kept as a full history report that you can open, print or search any time.')+'</p></div>';
+    o+='<div class="list">';
+    list.forEach(function(c){
+      o+='<article class="ent"><button class="ent-head" data-act="copen" data-id="'+c.id+'"><span class="ent-top"><span class="mono">'+esc(fmtShort(c.date))+'</span><span class="pill dept">'+esc(c.dept)+'</span><span>'+esc(patientText(c))+'</span></span><span class="ent-topic">'+esc(caseTitle(c))+'</span><span class="muted">'+esc(firstLine(c.cc,100))+'</span></button></article>';
+    });
+    return o+'</div></div>';
+  }
+  function binHtml(){
+    var del=Object.keys(docs).map(function(i){return docs[i]}).filter(function(d){return d.del&&(d.kind==="case"||d.kind==="entry"||d.kind==="posting")});
+    if(!del.length)return "";
+    var o='<div class="card"><div class="barhead"><h3>Recently deleted ('+del.length+')</h3><button class="mini" data-act="bin">'+(S.binOpen?'Hide':'Show')+'</button></div>';
+    if(S.binOpen){
+      o+='<p class="muted">These are kept, not erased. Restore any of them.</p><div class="list">'+del.sort(function(a,b){return (b.u||0)-(a.u||0)}).map(function(d){
+        var kind=d.kind==="case"?"Case":d.kind==="entry"?"Class":"Posting",name=d.kind==="case"?caseTitle(d):d.kind==="entry"?d.topic:d.dept;
+        return '<article class="ent"><div class="ent-head"><span class="ent-top"><span class="pill">'+kind+'</span>'+(d.date?'<span class="mono">'+esc(fmtShort(d.date))+'</span>':'')+'</span><span class="ent-topic">'+esc(name)+'</span><span><button class="mini" data-act="restore" data-id="'+d.id+'">Restore</button></span></div></article>';
+      }).join("")+'</div>';
+    }
+    return o+'</div>';
+  }
+  function caseAct(a,id,b){
+    var cs=S.cs;
+    if(a==="cnew"){cs.mode="form";cs.id=null;cs.form=blankCase();S.msg="";render();window.scrollTo(0,0);return true}
+    if(a==="copen"){cs.mode="report";cs.id=id;S.del=null;render();window.scrollTo(0,0);return true}
+    if(a==="cback"){cs.mode="list";S.del=null;render();return true}
+    if(a==="cedit"){var d=docs[id];if(!d)return true;cs.mode="form";cs.id=id;cs.form=caseFormFrom(d);S.msg="";render();window.scrollTo(0,0);return true}
+    if(a==="ccancel"){cs.mode=cs.id&&docs[cs.id]&&!docs[cs.id].del?"report":"list";cs.form=null;S.msg="";render();return true}
+    if(a==="csave"){saveCase();return true}
+    if(a==="cdel"){if(S.del===id){tomb(id);cs.mode="list";render()}else{S.del=id;renderData()}return true}
+    if(a==="cprint"){window.print();return true}
+    if(a==="ccopy"){
+      var c=docs[id];if(!c)return true;
+      try{navigator.clipboard.writeText(caseText(c)).then(function(){b.textContent="Copied"},function(){b.textContent="Copy failed"})}catch(x){b.textContent="Copy failed"}
+      return true;
+    }
+    if(a==="restore"){var r=docs[id];if(r){var cc=clone(r);delete cc.del;put(cc)}return true}
+    if(a==="bin"){S.binOpen=!S.binOpen;renderData();return true}
+    return false;
+  }
+
+  /* ---------- form state ---------- */
+  function lastEntry(){return entries()[0]||null}
+  function blankForm(){
+    var le=lastEntry(),pf=postingFor(S.day);
+    return {date:S.day,dept:pf?pf.dept:(le?le.dept:""),type:le?le.type:TYPES[0],topic:"",faculty:le?le.faculty:"",cases:"",points:"",skills:"",att:true,rev:false};
+  }
+  function formFrom(e){return {date:e.date,dept:e.dept,type:e.type,topic:e.topic,faculty:e.faculty||"",cases:e.cases||"",points:e.points||"",skills:e.skills||"",att:e.att!==false,rev:!!e.rev}}
+  function allDepts(){
+    var seen={},out=[];
+    DEPTS.concat(entries().map(function(e){return e.dept}),postings().map(function(p){return p.dept})).forEach(function(d){var k=d.toLowerCase();if(d&&!seen[k]){seen[k]=1;out.push(d)}});
+    return out;
+  }
+  function recentDepts(){
+    var seen={},out=[],pf=postingFor(S.day);
+    if(pf){seen[pf.dept.toLowerCase()]=1;out.push(pf.dept)}
+    entries().forEach(function(e){var k=e.dept.toLowerCase();if(!seen[k]&&out.length<5){seen[k]=1;out.push(e.dept)}});
+    return out;
+  }
+  function deptList(){return '<datalist id="dl-dept">'+allDepts().map(function(d){return '<option value="'+esc(d)+'">'}).join("")+'</datalist>'}
+
+  /* ---------- views ---------- */
+  function formHtml(){
+    var f=S.form,pf=postingFor(f.date),rd=recentDepts();
+    var o='<div class="card"><div class="barhead"><h2>'+(S.edit?'Edit class':'Log a class')+'</h2>'+(S.edit?'<button class="mini" data-act="cancel-edit">Cancel</button>':'')+'</div>';
+    if(pf)o+='<p class="muted">Current posting: <b>'+esc(pf.dept)+'</b>'+(pf.unit?' · '+esc(pf.unit):'')+'</p>';
+    o+='<div class="form">';
+    o+='<label>Date<input id="f-date" type="date" data-f="date" value="'+esc(f.date)+'"></label>';
+    o+='<label>Type<select id="f-type" data-f="type">'+TYPES.map(function(t){return '<option'+(t===f.type?' selected':'')+'>'+esc(t)+'</option>'}).join("")+'</select></label>';
+    o+='<label class="full">Department<input id="f-dept" data-f="dept" list="dl-dept" autocomplete="off" placeholder="e.g. General Medicine" value="'+esc(f.dept)+'"></label>'+deptList();
+    if(rd.length)o+='<div class="quick full">'+rd.map(function(d,i){return '<button type="button" data-act="dept" data-i="'+i+'">'+esc(d)+'</button>'}).join("")+'</div>';
+    o+='<label class="full">Topic<input id="f-topic" data-f="topic" autocomplete="off" placeholder="e.g. Cardiovascular examination, pallor and icterus" value="'+esc(f.topic)+'"></label>';
+    o+='<label class="full">Faculty (optional)<input id="f-faculty" data-f="faculty" autocomplete="off" placeholder="e.g. Dr. Kumar" value="'+esc(f.faculty)+'"></label>';
+    o+='<label class="full">Cases seen<textarea id="f-cases" data-f="cases" placeholder="e.g. 54 M, chronic liver disease, ascites">'+esc(f.cases)+'</textarea></label>';
+    o+='<p class="muted full" style="margin-top:-4px">Age, sex and diagnosis are enough. Leave out patient names and hospital numbers.</p>';
+    o+='<label class="full">Key points learned<textarea id="f-points" data-f="points" placeholder="What the faculty stressed, signs to remember, doubts to look up">'+esc(f.points)+'</textarea></label>';
+    o+='<label class="full">Skills observed or done<input id="f-skills" data-f="skills" autocomplete="off" placeholder="e.g. Pulse, BP, abdominal palpation" value="'+esc(f.skills)+'"></label>';
+    o+='<div class="fl full">Attendance<div class="seg"><button type="button" class="a" data-act="att" data-v="1" aria-pressed="'+(f.att?'true':'false')+'">Attended</button><button type="button" class="m" data-act="att" data-v="0" aria-pressed="'+(f.att?'false':'true')+'">Missed</button></div></div>';
+    o+='<label class="chk full"><input id="f-rev" type="checkbox" data-f="rev"'+(f.rev?' checked':'')+'> Mark for revision</label>';
+    o+='</div>';
+    if(S.msg)o+='<div class="note'+(S.msg==="Saved."?' good':' warn')+'" role="status">'+esc(S.msg)+'</div>';
+    o+='<button class="btn big" data-act="save">'+(S.edit?'Save changes':'Save class')+'</button></div>';
+    return o;
+  }
+  function renderShell(){var s=$("shell");if(s)s.innerHTML=formHtml()}
+
+  function entryHtml(e,showDate){
+    var open=!!S.open[e.id];
+    var snip=(e.cases||e.points||"").split("\n")[0];if(snip.length>90)snip=snip.slice(0,90)+"…";
+    var o='<article class="ent'+(e.att===false?' missed':'')+'"><button class="ent-head" data-act="open" data-id="'+e.id+'" aria-expanded="'+open+'">';
+    o+='<span class="ent-top">'+(showDate?'<span class="mono">'+esc(fmtShort(e.date))+'</span>':'')+'<span class="pill dept">'+esc(e.dept)+'</span><span>'+esc(e.type)+'</span>';
+    if(e.att===false)o+='<span class="pill bad">Missed</span>';
+    if(e.rev)o+='<span class="pill warn">Revise</span>';
+    o+='</span><span class="ent-topic">'+esc(e.topic)+'</span>';
+    if(!open&&snip)o+='<span class="muted">'+esc(snip)+'</span>';
+    o+='</button>';
+    if(open){
+      o+='<div class="ent-body">';
+      if(showDate)o+='<div class="fld"><small>Date</small><div>'+esc(fmtLong(e.date))+'</div></div>';
+      if(e.faculty)o+='<div class="fld"><small>Faculty</small><div>'+esc(e.faculty)+'</div></div>';
+      if(e.cases)o+='<div class="fld"><small>Cases seen</small><div>'+esc(e.cases)+'</div></div>';
+      if(e.points)o+='<div class="fld"><small>Key points</small><div>'+esc(e.points)+'</div></div>';
+      if(e.skills)o+='<div class="fld"><small>Skills</small><div>'+esc(e.skills)+'</div></div>';
+      if(!e.faculty&&!e.cases&&!e.points&&!e.skills)o+='<p class="muted">No extra notes. Tap Edit to add some.</p>';
+      o+='<div class="btnrow"><button class="mini" data-act="edit" data-id="'+e.id+'">Edit</button><button class="mini" data-act="rev" data-id="'+e.id+'">'+(e.rev?'Mark revised':'Mark for revision')+'</button>';
+      o+=S.del===e.id?'<button class="mini danger" data-act="del" data-id="'+e.id+'">Tap again to delete</button>':'<button class="mini danger" data-act="del" data-id="'+e.id+'">Delete</button>';
+      o+='</div></div>';
+    }
+    return o+'</article>';
+  }
+
+  function todayDyn(){
+    var mon=mondayOf(S.day),all=entries(),tk=todayKey(),o="";
+    var pf=postingFor(S.day);
+    // week card
+    var wkEntries=all.filter(function(e){return e.date>=mon&&e.date<=addDays(mon,6)});
+    var att=wkEntries.filter(function(e){return e.att!==false}),dset={};att.forEach(function(e){dset[e.date]=1});
+    var rv=wkEntries.filter(function(e){return e.rev}).length;
+    o+='<div class="card"><div class="barhead"><h2>Week</h2><div class="weeknav"><button data-act="wprev" aria-label="Previous week">‹</button><span>'+esc(fmtShort(mon))+' – '+esc(fmtShort(addDays(mon,6)))+'</span><button data-act="wnext" aria-label="Next week">›</button></div></div><div class="wk">';
+    for(var i=0;i<7;i++){
+      var k=addDays(mon,i),a=0,m=0;
+      all.forEach(function(e){if(e.date===k){if(e.att===false)m++;else a++}});
+      var cls="wd"+(a?" has":(m?" miss":""))+(k===tk?" today":"")+(k===S.day?" sel":"")+(k>tk?" future":"");
+      o+='<button class="'+cls+'" data-act="day" data-k="'+k+'" aria-label="'+esc(fmtLong(k))+'"'+(k===S.day?' aria-current="date"':'')+'><span>'+DAYS[i]+'</span><b>'+parse(k).getDate()+'</b><em>'+(a||m||"")+'</em></button>';
+    }
+    o+='</div><p class="muted">This week: <b>'+att.length+'</b> class'+(att.length===1?'':'es')+' on <b>'+Object.keys(dset).length+'</b> day'+(Object.keys(dset).length===1?'':'s')+(rv?' · <b>'+rv+'</b> to revise':'')+'.</p></div>';
+    // posting banner
+    if(pf){
+      var total=diffDays(pf.start,pf.end)+1,dayN=Math.min(total,diffDays(pf.start,S.day)+1);
+      o+='<div class="card"><div class="barhead"><h3>'+esc(pf.dept)+(pf.unit?' · '+esc(pf.unit):'')+'</h3><span class="pill dept">Day '+dayN+' of '+total+'</span></div><div class="prog" aria-hidden="true"><i style="width:'+(dayN/total*100)+'%"></i></div></div>';
+    }
+    // day list
+    var day=all.filter(function(e){return e.date===S.day});
+    o+='<div class="card"><div class="barhead"><h2>'+(S.day===tk?'Today':esc(fmtLong(S.day)))+'</h2>'+(S.day!==tk?'<button class="mini" data-act="gotoday">Back to today</button>':'<span class="muted mono">'+esc(fmtLong(S.day))+'</span>')+'</div>';
+    o+=day.length?'<div class="list">'+day.map(function(e){return entryHtml(e,false)}).join("")+'</div>':'<p class="muted">No classes logged for this day yet. Add one using the form.</p>';
+    return o+'</div>';
+  }
+
+  function historyShell(){
+    var h=S.hf;
+    function opts(list,cur,first){return '<option value="">'+first+'</option>'+list.map(function(x){return '<option'+(x===cur?' selected':'')+'>'+esc(x)+'</option>'}).join("")}
+    return '<div class="card"><h2>Look back</h2><div class="filters">'+
+      '<label class="full fl">Search<input id="h-q" type="search" data-h="q" autocomplete="off" placeholder="Topic, case, key point, skill, faculty" value="'+esc(h.q)+'"></label>'+
+      '<label class="fl">Department<select id="h-dept" data-h="dept">'+opts(allDepts(),h.dept,"All")+'</select></label>'+
+      '<label class="fl">Type<select id="h-type" data-h="type">'+opts(TYPES,h.type,"All")+'</select></label>'+
+      '<label class="fl">From<input id="h-from" type="date" data-h="from" value="'+esc(h.from)+'"></label>'+
+      '<label class="fl">To<input id="h-to" type="date" data-h="to" value="'+esc(h.to)+'"></label>'+
+      '<label class="full fl">Show<select id="h-flag" data-h="flag"><option value="">All classes</option><option value="rev"'+(h.flag==="rev"?' selected':'')+'>To revise</option><option value="miss"'+(h.flag==="miss"?' selected':'')+'>Missed</option></select></label>'+
+      '</div><div class="btnrow"><button class="mini" data-act="clearf">Clear filters</button></div></div>';
+  }
+  function historyDyn(){return historyList()+binHtml()}
+  function historyList(){
+    var h=S.hf,q=h.q.trim().toLowerCase();
+    var list=entries().filter(function(e){
+      if(h.dept&&e.dept!==h.dept)return false;
+      if(h.type&&e.type!==h.type)return false;
+      if(h.from&&e.date<h.from)return false;
+      if(h.to&&e.date>h.to)return false;
+      if(h.flag==="rev"&&!e.rev)return false;
+      if(h.flag==="miss"&&e.att!==false)return false;
+      if(q){var t=[e.topic,e.cases,e.points,e.skills,e.faculty,e.dept,e.type].join(" ").toLowerCase();if(t.indexOf(q)<0)return false}
+      return true;
+    });
+    var o='<div class="card"><div class="barhead"><h2>Results</h2><span class="muted">'+list.length+' class'+(list.length===1?'':'es')+'</span></div>';
+    if(!list.length){return o+'<p class="muted">'+(entries().length?'Nothing matches these filters.':'Your logged classes will show up here.')+'</p></div>'}
+    var shown=list.slice(0,h.lim),last="";
+    o+='<div class="list">';
+    shown.forEach(function(e){
+      if(e.date!==last){last=e.date;o+='<div class="dayh">'+esc(fmtLong(e.date))+'</div>'}
+      o+=entryHtml(e,false);
+    });
+    o+='</div>';
+    if(list.length>shown.length)o+='<button class="btn ghost" data-act="more">Show more</button>';
+    return o+'</div>';
+  }
+
+  function postingsShell(){
+    var f=S.pform;
+    var o='<div class="card"><div class="barhead"><h2>'+(S.pEdit?'Edit posting':'Add a posting')+'</h2>'+(S.pEdit?'<button class="mini" data-act="pcancel">Cancel</button>':'')+'</div><div class="form">';
+    o+='<label class="full">Department<input id="p-dept" data-p="dept" list="dl-dept" autocomplete="off" placeholder="e.g. General Medicine" value="'+esc(f.dept)+'"></label>'+deptList();
+    o+='<label class="full">Unit or ward (optional)<input id="p-unit" data-p="unit" autocomplete="off" placeholder="e.g. Unit M2, Ward 14" value="'+esc(f.unit)+'"></label>';
+    o+='<label>Starts<input id="p-start" type="date" data-p="start" value="'+esc(f.start)+'"></label>';
+    o+='<label>Ends<input id="p-end" type="date" data-p="end" value="'+esc(f.end)+'"></label></div>';
+    if(S.pmsg)o+='<div class="note warn" role="status">'+esc(S.pmsg)+'</div>';
+    return o+'<button class="btn big" data-act="psave">'+(S.pEdit?'Save changes':'Add posting')+'</button></div>';
+  }
+  function postingsDyn(){
+    var list=postings(),tk=todayKey(),all=entries();
+    var o='<div class="card"><h2>Your postings</h2>';
+    if(!list.length)return o+'<p class="muted">Add each rotation with its start and end dates. The Today tab then fills in the department for you and shows which day of the posting you are on.</p></div>';
+    o+='<div class="list">';
+    list.forEach(function(p){
+      var inR=all.filter(function(e){return e.date>=p.start&&e.date<=p.end&&e.dept.toLowerCase()===p.dept.toLowerCase()});
+      var a=inR.filter(function(e){return e.att!==false}).length,m=inR.length-a,total=diffDays(p.start,p.end)+1;
+      var st=tk<p.start?["Upcoming","pill"]:tk>p.end?["Completed","pill good"]:["Current","pill dept"];
+      var open=!!S.open[p.id];
+      o+='<article class="ent"><button class="ent-head" data-act="popen" data-id="'+p.id+'" aria-expanded="'+open+'"><span class="ent-top"><span class="'+st[1]+'">'+st[0]+'</span><span class="mono">'+esc(fmtShort(p.start))+' – '+esc(fmtShort(p.end))+'</span></span><span class="ent-topic">'+esc(p.dept)+(p.unit?' · '+esc(p.unit):'')+'</span><span class="muted">'+a+' attended'+(m?' · '+m+' missed':'')+' · '+total+' days</span>';
+      if(st[0]==="Current"){var dn=diffDays(p.start,tk)+1;o+='<span class="prog" aria-hidden="true"><i style="width:'+(dn/total*100)+'%"></i></span>'}
+      o+='</button>';
+      if(open){
+        o+='<div class="ent-body">';
+        o+=inR.length?'<div class="fld"><small>Classes in this posting</small><div>'+inR.slice().reverse().map(function(e){return esc(fmtShort(e.date))+'  '+esc(e.topic)+(e.att===false?' (missed)':'')}).join("\n")+'</div></div>':'<p class="muted">No classes logged in this posting yet.</p>';
+        o+='<div class="btnrow"><button class="mini" data-act="pedit" data-id="'+p.id+'">Edit</button>';
+        o+=S.del===p.id?'<button class="mini danger" data-act="pdel" data-id="'+p.id+'">Tap again to delete</button>':'<button class="mini danger" data-act="pdel" data-id="'+p.id+'">Delete</button>';
+        o+='</div></div>';
+      }
+      o+='</article>';
+    });
+    return o+'</div></div>';
+  }
+
+  function barRows(map,max,curKey){
+    var ks=Object.keys(map);
+    return '<div class="bars">'+ks.map(function(k){var v=map[k];return '<div class="brow'+(k===curKey?' cur':'')+'"><span title="'+esc(k)+'">'+esc(k)+'</span><span class="tr"><i style="width:'+(max?v/max*100:0)+'%"></i></span><b>'+v+'</b></div>'}).join("")+'</div>';
+  }
+  function statsDyn(){
+    var all=entries();
+    if(!all.length)return '<div class="card"><h2>Stats</h2><p class="muted">Log a few classes and your attendance, weekly pace and departments show up here.</p></div>';
+    var att=all.filter(function(e){return e.att!==false}),miss=all.length-att.length,days={};
+    att.forEach(function(e){days[e.date]=1});
+    var rev=all.filter(function(e){return e.rev});
+    var pct=all.length?Math.round(att.length/all.length*100)+"%":"–";
+    var o='<div class="card"><h2>Overall</h2><div class="tiles"><div class="tile"><b>'+att.length+'</b><span>Classes attended</span></div><div class="tile"><b>'+casesAll().length+'</b><span>Cases logged</span></div><div class="tile"><b>'+pct+'</b><span>Attendance'+(miss?' ('+miss+' missed)':'')+'</span></div><div class="tile"><b>'+rev.length+'</b><span>To revise</span></div></div></div>';
+    // weeks
+    var curMon=mondayOf(todayKey()),wm={},wmax=0;
+    for(var i=7;i>=0;i--){var m=addDays(curMon,-7*i),n=att.filter(function(e){return e.date>=m&&e.date<=addDays(m,6)}).length;wm[fmtShort(m)]=n;wmax=Math.max(wmax,n)}
+    o+='<div class="card"><h2>Last 8 weeks</h2>'+barRows(wm,wmax,fmtShort(curMon))+'<p class="muted">Classes attended per week, by Monday date. Green is this week.</p></div>';
+    // dept + type
+    function tally(f){var m={};att.forEach(function(e){var k=f(e);m[k]=(m[k]||0)+1});var ks=Object.keys(m).sort(function(a,b){return m[b]-m[a]}).slice(0,8),r={},mx=0;ks.forEach(function(k){r[k]=m[k];mx=Math.max(mx,m[k])});return [r,mx]}
+    var d=tally(function(e){return e.dept}),t=tally(function(e){return e.type});
+    o+='<div class="card"><h2>By department</h2>'+barRows(d[0],d[1])+'</div><div class="card"><h2>By type of class</h2>'+barRows(t[0],t[1])+'</div>';
+    // revise list
+    o+='<div class="card"><div class="barhead"><h2>To revise</h2><span class="muted">'+rev.length+' flagged</span></div>';
+    if(!rev.length)o+='<p class="muted">Tick "Mark for revision" on a class and it waits here until you mark it revised.</p>';
+    else o+='<div class="list">'+rev.slice().reverse().slice(0,10).map(function(e){return '<article class="ent"><div class="ent-head"><span class="ent-top"><span class="mono">'+esc(fmtShort(e.date))+'</span><span class="pill dept">'+esc(e.dept)+'</span></span><span class="ent-topic">'+esc(e.topic)+'</span><span><button class="mini" data-act="rev" data-id="'+e.id+'">Mark revised</button></span></div></article>'}).join("")+'</div>';
+    return o+'</div>';
+  }
+
+  /* ---------- render ---------- */
+  var view=$("view");
+  function render(){
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(b){b.setAttribute("aria-selected",String(b.dataset.tab===S.tab))});
+    if(S.tab==="today"){if(!S.form)S.form=blankForm();view.innerHTML='<div class="two"><div id="shell">'+formHtml()+'</div><div id="dyn" class="stack"></div></div>'}
+    else if(S.tab==="history")view.innerHTML='<div class="stack">'+historyShell()+'<div id="dyn" class="stack"></div></div>';
+    else if(S.tab==="cases"){
+      var cs=S.cs;
+      if(cs.mode==="form"){if(!cs.form)cs.form=blankCase();view.innerHTML='<div id="shell">'+caseFormHtml()+'</div>'}
+      else if(cs.mode==="report"&&docs[cs.id]&&!docs[cs.id].del)view.innerHTML='<div id="shell">'+reportHtml(cs.id)+'</div>';
+      else{cs.mode="list";view.innerHTML='<div class="stack"><div id="shell">'+casesListShell()+'</div><div id="dyn" class="stack"></div></div>'}
+    }
+    else if(S.tab==="postings"){if(!S.pform)S.pform=blankPosting();view.innerHTML='<div class="stack"><div id="shell">'+postingsShell()+'</div><div id="dyn" class="stack"></div></div>'}
+    else view.innerHTML='<div id="dyn" class="stack"></div>';
+    renderData();
+  }
+  function renderData(){
+    var d=$("dyn");
+    if(S.tab==="cases"&&S.cs.mode==="report"){var rs=$("shell");if(rs&&docs[S.cs.id]&&!docs[S.cs.id].del)rs.innerHTML=reportHtml(S.cs.id)}
+    if(d)d.innerHTML=S.tab==="today"?todayDyn():S.tab==="cases"?casesDyn():S.tab==="history"?historyDyn():S.tab==="postings"?postingsDyn():statsDyn();
+    syncLabel();
+  }
+  function blankPosting(){var pf=postings()[0];var s=todayKey();return {dept:"",unit:"",start:s,end:addDays(s,13)}}
+
+  /* ---------- actions ---------- */
+  function saveEntry(){
+    var f=S.form;
+    if(!f.date||!f.dept.trim()||!f.topic.trim()){S.msg="Add the date, department and topic first.";renderShell();return}
+    var old=S.edit&&docs[S.edit];
+    put({kind:"entry",id:old?old.id:nid("e"),date:f.date,dept:f.dept.trim(),type:f.type,topic:f.topic.trim(),faculty:f.faculty.trim(),cases:f.cases.trim(),points:f.points.trim(),skills:f.skills.trim(),att:!!f.att,rev:!!f.rev,created:old?old.created:Date.now()});
+    S.day=f.date;S.edit=null;S.form=blankForm();S.msg="Saved.";renderShell();renderData();
+  }
+  function savePosting(){
+    var f=S.pform;
+    if(!f.dept.trim()||!f.start||!f.end){S.pmsg="Add the department, start date and end date.";renderPShell();return}
+    if(f.end<f.start){S.pmsg="The end date is before the start date.";renderPShell();return}
+    var old=S.pEdit&&docs[S.pEdit];
+    put({kind:"posting",id:old?old.id:nid("p"),dept:f.dept.trim(),unit:f.unit.trim(),start:f.start,end:f.end});
+    S.pEdit=null;S.pmsg="";S.pform=blankPosting();renderPShell();renderData();
+  }
+  function renderPShell(){var s=$("shell");if(s)s.innerHTML=postingsShell()}
+  function tomb(id){var d=docs[id];if(!d)return;var c=clone(d);c.del=true;put(c);S.del=null;delete S.open[id];renderData()}
+
+  document.getElementById("tabs").addEventListener("click",function(e){
+    var b=e.target.closest("button");if(!b)return;
+    S.tab=b.dataset.tab;S.del=null;S.msg="";S.pmsg="";render();
+  });
+  view.addEventListener("click",function(e){
+    var b=e.target.closest("[data-act]");if(!b)return;
+    var a=b.dataset.act,id=b.dataset.id;
+    if(caseAct(a,id,b))return;
+    if(a==="open"||a==="popen"){S.open[id]=!S.open[id];S.del=null;renderData()}
+    else if(a==="day"){S.day=b.dataset.k;if(!S.edit){S.form.date=S.day}S.del=null;renderShell();renderData()}
+    else if(a==="wprev"||a==="wnext"){S.day=addDays(S.day,a==="wprev"?-7:7);if(!S.edit)S.form.date=S.day;renderShell();renderData()}
+    else if(a==="gotoday"){S.day=todayKey();if(!S.edit)S.form.date=S.day;renderShell();renderData()}
+    else if(a==="att"){S.form.att=b.dataset.v==="1";renderShell()}
+    else if(a==="dept"){S.form.dept=recentDepts()[+b.dataset.i];renderShell()}
+    else if(a==="save")saveEntry();
+    else if(a==="cancel-edit"){S.edit=null;S.form=blankForm();S.msg="";renderShell()}
+    else if(a==="edit"){var d=docs[id];if(!d)return;S.edit=id;S.form=formFrom(d);S.day=d.date;S.tab="today";S.msg="";render();window.scrollTo(0,0)}
+    else if(a==="rev"){var r=docs[id];if(!r)return;var c=clone(r);c.rev=!c.rev;put(c)}
+    else if(a==="del"){if(S.del===id)tomb(id);else{S.del=id;renderData()}}
+    else if(a==="more"){S.hf.lim+=40;renderData()}
+    else if(a==="clearf"){S.hf={q:"",dept:"",type:"",flag:"",from:"",to:"",lim:40};render()}
+    else if(a==="psave")savePosting();
+    else if(a==="pcancel"){S.pEdit=null;S.pform=blankPosting();S.pmsg="";renderPShell()}
+    else if(a==="pedit"){var p=docs[id];if(!p)return;S.pEdit=id;S.pform={dept:p.dept,unit:p.unit||"",start:p.start,end:p.end};S.pmsg="";renderPShell();window.scrollTo(0,0)}
+    else if(a==="pdel"){if(S.del===id)tomb(id);else{S.del=id;renderData()}}
+  });
+  view.addEventListener("input",function(e){
+    var el=e.target,d=el.dataset;if(!d)return;
+    if(d.c){S.cs.form[d.c]=el.value;return}
+    if(d.cf==="q"){S.cs.q=el.value;renderData();return}
+    if(d.f&&el.type!=="checkbox"){S.form[d.f]=el.value;if(S.msg){S.msg="";var n=document.querySelector("#shell .note");if(n)n.remove()}}
+    else if(d.p){S.pform[d.p]=el.value}
+    else if(d.h==="q"){S.hf.q=el.value;S.hf.lim=40;renderData()}
+  });
+  view.addEventListener("change",function(e){
+    var el=e.target,d=el.dataset;if(!d)return;
+    if(d.c==="date"){S.cs.form.date=el.value;S.cs.form.classId="";renderCaseForm();return}
+    if(d.c){S.cs.form[d.c]=el.value;return}
+    if(d.cf){S.cs[d.cf]=el.value;renderData();return}
+    if(d.f==="rev"){S.form.rev=el.checked}
+    else if(d.f==="date"){S.form.date=el.value}
+    else if(d.f){S.form[d.f]=el.value}
+    else if(d.h&&d.h!=="q"){S.hf[d.h]=el.value;S.hf.lim=40;renderData()}
+  });
+
+  /* ---------- backup ---------- */
+  function foot(t,c){var f=$("footmsg");f.innerHTML=t?'<div class="note '+(c||"")+'" role="status">'+esc(t)+'</div>':""}
+  $("exp").addEventListener("click",function(){
+    var payload=JSON.stringify({app:"posting-log",v:1,at:new Date().toISOString(),docs:Object.keys(docs).map(function(i){return docs[i]})});
+    try{var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([payload],{type:"application/json"}));a.download="posting-log-backup-"+todayKey()+".json";document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},2000);foot("Backup file created.","good")}
+    catch(x){foot("Could not save the backup file here.","warn")}
+  });
+  $("imp").addEventListener("click",function(){$("impfile").click()});
+  $("impfile").addEventListener("change",function(e){
+    var f=e.target.files&&e.target.files[0];if(!f)return;
+    var r=new FileReader();
+    r.onload=function(){
+      try{
+        var d=JSON.parse(r.result);if(d.app!=="posting-log"||!Array.isArray(d.docs))throw 0;
+        var n=0;d.docs.forEach(function(x){if(!x||!x.id||!x.kind)return;var l=docs[x.id];if(!l||(x.u||0)>(l.u||0)){docs[x.id]=x;n++;queuePush(x.id)}});
+        saveLocal();render();foot("Restored "+n+" item"+(n===1?"":"s")+" from the file.","good");
+      }catch(x){foot("That file is not a Posting Log backup.","warn")}
+    };
+    r.readAsText(f);e.target.value="";
+  });
+
+  /* ---------- start ---------- */
+  loadLocal();loadCfg();
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+  render();renderSyncBox();syncLabel();
+  if(cfg.token)syncNow();
+  document.addEventListener("visibilitychange",function(){if(!document.hidden&&cfg.token)syncNow()});
+  window.addEventListener("online",function(){if(cfg.token)syncNow()});
+  $("syncbox").addEventListener("click",function(e){
+    var id=e.target.id;
+    if(id==="conn"){
+      var t=($("gh-token").value||"").trim();
+      if(!t){renderSyncBox("Paste your GitHub token first.");return}
+      cfg={token:t,gist:"",last:0};saveCfg();syncMode="ok";
+      syncNow().then(function(){renderSyncBox(syncMode==="error"?syncErr:"");if(syncMode==="error"){cfg={token:"",gist:"",last:0};saveCfg();renderSyncBox(syncErr);syncLabel()}});
+    }
+    else if(id==="syncnow"){syncNow()}
+    else if(id==="disc"){e.target.textContent="Tap again to disconnect";e.target.id="disc2"}
+    else if(id==="disc2"){cfg={token:"",gist:"",last:0};saveCfg();syncMode="off";renderSyncBox();syncLabel()}
+  });
+  if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}
+})();
+</script>
+</body></html>
